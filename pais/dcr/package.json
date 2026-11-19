@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "[ -d vendor/dcr-js ] || (git clone -q https://github.com/hugoalopez-dtu/dcr-js vendor/dcr-js && git -C vendor/dcr-js checkout -q aa7ac3ec95ea2f362947f624b12a701a580da72b)",
+    "postinstall": "node -e \"const fs=require('fs'),{execSync:x}=require('child_process');if(!fs.existsSync('vendor/dcr-js')){x('git clone -q https://github.com/hugoalopez-dtu/dcr-js vendor/dcr-js');x('git -C vendor/dcr-js checkout -q aa7ac3ec95ea2f362947f624b12a701a580da72b')}\"",
     "start": "tsx server.mts"
   },
   "dependencies": {

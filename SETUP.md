@@ -49,11 +49,16 @@ cd pais/dcr && npm install && cd ../..   # also downloads processdoctor's DCR en
 ```bash
 MSYS_NO_PATHCONV=1 docker run --rm -it --name siddhi -p 8006:8006 \
   --add-host=host.docker.internal:host-gateway \
-  -v "$PWD/siddhi":/apps siddhiio/siddhi-runner-alpine -Dapps=/apps
+  -v "$PWD/siddhi/P4Events.siddhi":/apps/P4Events.siddhi \
+  siddhiio/siddhi-runner-alpine -Dapps=/apps/P4Events.siddhi
 ```
 
-This loads every app in `siddhi/`. Wait for `P4Events ... deployed`.
-`MSYS_NO_PATHCONV=1` is only needed in Git Bash on Windows.
+This mounts `siddhi/P4Events.siddhi` into the container and deploys it, so nothing has to be
+pasted anywhere. Wait for `P4Events ... deployed`. After changing the file, stop the container
+(Ctrl+C) and run the command again. `MSYS_NO_PATHCONV=1` is only needed in Git Bash on Windows.
+
+Siddhi has no web page in this mode; it listens on `http://localhost:8006/publications` (from the
+poller) and `http://localhost:8006/dcr-events` (from the PAIS).
 
 To edit the app with a GUI instead, run the editor
 (`siddhiio/siddhi-tooling`, ports 9390 and 8006), open http://localhost:9390/editor and paste

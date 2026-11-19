@@ -8,7 +8,7 @@ import { Reader } from "moddle-xml";
 import { moddleToDCR } from "./vendor/dcr-js/dcr-engine/src/graphConversion.ts";
 import { executeS, isEnabledS } from "./vendor/dcr-js/dcr-engine/src/executionEngine.ts";
 
-const SIDDHI = "http://localhost:8006/dcr-events";
+const SIDDHI = process.env.SIDDHI_URL ?? "http://localhost:8006/dcr-events";
 const DAY = 86_400_000;
 
 // Load the model
@@ -100,7 +100,7 @@ http.createServer(async (req, res) => {
         res.writeHead(code);
         res.end(typeof data === "string" ? data : JSON.stringify(data) + "\n");
     };
-
+    if (a === "health") return reply(200, { ok: true });
     if (a === "cases" && !id) {
         // POST /cases {caseId, authorId, start}
         cases[b.caseId] = { authorId: b.authorId, g: moddleToDCR(registry), now: new Date(b.start), log: [] };
