@@ -5,3 +5,5 @@ __pycache__/
 src/**/state/
 pais/dcr/node_modules/
 pais/dcr/vendor/
+*.zip
+output/

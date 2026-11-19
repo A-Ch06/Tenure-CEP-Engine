@@ -1,6 +1,6 @@
 # Tenure-CEP-Engine
 
-Group 27, DTU 02268 POEDSS final project: Talent Management Processes at DTU.
+Group 15, DTU 02268 POEDSS final project: Talent Management Processes at DTU.
 Event sources feed a CEP engine (Siddhi), which communicates in both directions with
 process-aware information systems (PAIS).
 
@@ -19,9 +19,11 @@ event sources ──► Siddhi (CEP) ◄──► PAIS
 ## Structure
 
 ```
-siddhi/     Siddhi apps (.siddhi), one per process
-src/        event sources
-pais/       one folder per PAIS, each with its process model and connector
+siddhi/             Siddhi apps (.siddhi), one per process
+src/                event sources, each with its own Dockerfile
+pais/               one folder per PAIS, each with its process model, connector and Dockerfile
+demo/               script that plays the users of the PAIS for a demo case
+docker-compose.yml  runs everything with one command
 ```
 
 ## Processes
@@ -30,9 +32,15 @@ pais/       one folder per PAIS, each with its process model and connector
 | ------------------------------------ | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------- |
 | P4 Career advancement (tenure track) | OpenAlex research output (`src/openalex/`) | DCR engine, processdoctor's dcr-js (`pais/dcr/`) | `pais/dcr/p4_career_advancement_tobe.xml` |
 
-## Setup
+## Quick start
 
-See [SETUP.md](SETUP.md) for installation on Linux and Windows and how to run a case.
+With Docker installed (Linux, Windows or Mac):
+
+```bash
+docker compose up --build
+```
+
+See [SETUP.md](SETUP.md) for details and for running the components manually.
 
 ## Notes
 
