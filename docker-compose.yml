@@ -1,44 +1,50 @@
-# One command for the whole P4 demo:  docker compose up --build
+x-proof-log: &proof-log "${LOG_DIR:-${HOME:-${USERPROFILE}}/Desktop}:/logs"
+
 services:
   siddhi:
     image: siddhiio/siddhi-runner-alpine
+    user: root
     command: -Dapps=/apps/P4Events.siddhi
     ports: ["8006:8006"]
-    extra_hosts: ["host.docker.internal:host-gateway"] # Siddhi reaches the PAIS via the host
-    volumes: ["./siddhi/P4Events.siddhi:/apps/P4Events.siddhi:ro"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes: ["./siddhi/P4Events.siddhi:/apps/P4Events.siddhi:ro", *proof-log]
 
   pais:
     build: ./pais/dcr
     ports: ["8090:8090"]
     environment:
       SIDDHI_URL: http://siddhi:8006/dcr-events
+      LOG_FILE: /logs/p4_proof_log.txt
+    volumes: [*proof-log]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
       interval: 3s
       retries: 40
 
-  case-setup: # creates the case and requests the assessment
+  case-setup:
     image: curlimages/curl
     user: root
     entrypoint: ["sh", "/demo/case.sh", "setup"]
-    volumes: ["./demo:/demo:ro"]
+    volumes: ["./demo:/demo:ro", *proof-log]
     depends_on:
       pais: { condition: service_healthy }
       siddhi: { condition: service_started }
 
-  poller: # event source: new publications from OpenAlex
+  poller:
     build: ./src/openalex
     command: ["A5069386704", "2025-01-01"]
     environment:
       SIDDHI_URL: http://siddhi:8006/publications
+      LOG_FILE: /logs/p4_proof_log.txt
       OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
+    volumes: [*proof-log]
     depends_on:
       case-setup: { condition: service_completed_successfully }
 
-  case-finish: # finishes the case once the research output has arrived
+  case-finish:
     image: curlimages/curl
     user: root
     entrypoint: ["sh", "/demo/case.sh", "finish"]
-    volumes: ["./demo:/demo:ro", "./output:/output"]
+    volumes: ["./demo:/demo:ro", "./output:/output", *proof-log]
     depends_on:
       case-setup: { condition: service_completed_successfully }
