@@ -1,6 +1,3 @@
-// DCR PAIS for P4: runs the TO-BE DCR graph with processdoctor's engine (dcr-js).
-// CEP -> PAIS: POST /research-output executes "Update research output".
-// PAIS -> CEP: every executed event is sent to Siddhi.
 import fs from "node:fs";
 import http from "node:http";
 import { Moddle } from "moddle";
@@ -9,6 +6,17 @@ import { moddleToDCR } from "./vendor/dcr-js/dcr-engine/src/graphConversion.ts";
 import { executeS, isEnabledS } from "./vendor/dcr-js/dcr-engine/src/executionEngine.ts";
 
 const SIDDHI = process.env.SIDDHI_URL ?? "http://localhost:8006/dcr-events";
+const LOG_FILE = process.env.LOG_FILE; // optional, e.g. ~/Desktop/p4_proof_log.txt
+
+// Append one line to the shared proof log, if LOG_FILE is set
+function log(label: string, fields: Record<string, unknown> = {}) {
+    if (!LOG_FILE) return;
+    const details = Object.entries(fields)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(" ");
+    const time = new Date().toISOString().slice(0, 19).replace("T", " ");
+    fs.appendFileSync(LOG_FILE, `${time} [PAIS] ${label}${details ? " | " + details : ""}\n`);
+}
 const DAY = 86_400_000;
 
 // Load the model
@@ -44,19 +52,31 @@ const role: Record<string, string> = Object.fromEntries(
 // One case = one tenure-track employee
 const cases: Record<string, { authorId: string; g: any; now: Date; log: any[] }> = {};
 
+const lastBlocked: Record<string, string> = {}; // avoid logging the same refusal repeatedly
+
 async function execute(id: string, ev: string) {
     const c = cases[id];
     const st = isEnabledS(ev, c.g, c.g.subProcessMap[ev] ?? c.g, {}, c.now);
-    if (!st.enabled) return st;
+    if (!st.enabled) {
+        if (lastBlocked[id + ev] !== st.msg) {
+            lastBlocked[id + ev] = st.msg;
+            log("refused event (DCR rule)", { case: id, event: c.g.labelMap[ev] ?? ev, reason: st.msg });
+        }
+        return st;
+    }
+    delete lastBlocked[id + ev];
     executeS(ev, c.g, {}, c.now);
     const label = c.g.labelMap[ev];
     c.log.push({ label, role: role[ev], time: c.now.toISOString() });
     console.log(`[${id}] ${c.now.toISOString().slice(0, 10)} ${label}`);
+    log("executed event", { case: id, event: label, role: role[ev], simTime: c.now.toISOString().slice(0, 10) });
     fetch(SIDDHI, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ event: { caseId: id, authorId: c.authorId, activity: ev, label } }),
-    }).catch(() => console.log("Siddhi not reachable"));
+    })
+        .then(() => log("sent event to Siddhi", { case: id, event: label }))
+        .catch(() => console.log("Siddhi not reachable"));
     await autoRun(id);
     return st;
 }
@@ -104,10 +124,12 @@ http.createServer(async (req, res) => {
     if (a === "cases" && !id) {
         // POST /cases {caseId, authorId, start}
         cases[b.caseId] = { authorId: b.authorId, g: moddleToDCR(registry), now: new Date(b.start), log: [] };
+        log("created case", { case: b.caseId, author: b.authorId, start: b.start });
         return reply(201, { created: b.caseId });
     }
     if (a === "research-output") {
         // from Siddhi
+        log("received research output from Siddhi", { author: b.authorId, work: b.workId });
         for (const [cid, c] of Object.entries(cases)) if (c.authorId === b.authorId) await execute(cid, "update");
         return reply(200, { ok: true });
     }
@@ -123,6 +145,7 @@ http.createServer(async (req, res) => {
             cases[id].now = new Date(cases[id].now.getTime() + DAY);
             await autoRun(id);
         }
+        log("advanced case clock", { case: id, days: b.days, simTime: cases[id].now.toISOString().slice(0, 10) });
         return reply(200, { now: cases[id].now });
     }
     reply(404, { error: "unknown" });

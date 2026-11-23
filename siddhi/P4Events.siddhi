@@ -18,6 +18,11 @@ define stream ResearchOutputUpdated (authorId string, workId string);
 @sink(type='log', prefix='ALERT')
 define stream Alerts (caseId string, authorId string, publications long);
 
+-- Output 3: shared proof log (a text file mounted from the user's desktop)
+@sink(type='file', file.uri='/logs/p4_proof_log.txt', append='true',
+      @map(type='text', @payload("{{time}} [SIDDHI] {{label}} | case={{caseId}} author={{author}} work={{work}} info={{detail}}")))
+define stream LogStream (time string, label string, caseId string, author string, work string, detail string);
+
 @primaryKey('authorId')
 define table PublicationCount (authorId string, publications long);
 
@@ -38,3 +43,20 @@ from ProcessEventStream[activity == 'req' or activity == 'early'] as r
 select r.caseId, r.authorId, ifThenElse(p.publications is null, 0L, p.publications) as publications
 having publications < 3
 insert into Alerts;
+
+-- Logging: every step Siddhi takes is written to the central log
+from PublicationStream
+select time:currentTimestamp() as time, 'received paper from poller' as label, '-' as caseId, authorId as author, workId as work, publicationDate as detail
+insert into LogStream;
+
+from ResearchOutputUpdated
+select time:currentTimestamp() as time, 'forwarded paper to PAIS' as label, '-' as caseId, authorId as author, workId as work, '-' as detail
+insert into LogStream;
+
+from ProcessEventStream
+select time:currentTimestamp() as time, 'received event from PAIS' as label, caseId, authorId as author, '-' as work, label as detail
+insert into LogStream;
+
+from Alerts
+select time:currentTimestamp() as time, 'ALERT: assessment requested with few publications' as label, caseId, authorId as author, '-' as work, convert(publications, 'string') as detail
+insert into LogStream;
